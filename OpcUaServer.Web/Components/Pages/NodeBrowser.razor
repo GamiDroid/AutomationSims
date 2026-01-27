@@ -1,0 +1,368 @@
+@page "/nodes"
+@using OpcUaServer.Web.Models
+@using OpcUaServer.Web.Services
+@inject OpcUaNodeService NodeService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Node Browser</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">OPC UA Node Browser</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="5">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row="true" Class="mb-4" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.h6">Address Space</MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="@(() => OpenCreateDialog(null))">
+                    Add Root Node
+                </MudButton>
+            </MudStack>
+            
+            <MudList T="OpcUaNode" Dense="true">
+                @foreach (var rootNode in _rootNodes)
+                {
+                    <MudListItem T="OpcUaNode">
+                        <ChildContent>
+                            @RenderNodeTree(rootNode, 0)
+                        </ChildContent>
+                    </MudListItem>
+                }
+            </MudList>
+        </MudPaper>
+    </MudItem>
+    
+    <MudItem xs="12" md="7">
+        @if (_selectedNode != null)
+        {
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" Class="mb-4" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h6">Node Details</MudText>
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit"
+                                   OnClick="OpenEditDialog">
+                            Edit
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                                   OnClick="DeleteSelectedNode">
+                            Delete
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+                
+                <MudSimpleTable Dense="true" Striped="true" Bordered="true">
+                    <tbody>
+                        <tr>
+                            <td><strong>Node ID</strong></td>
+                            <td><MudText Typo="Typo.body2" Style="font-family: monospace;">@_selectedNode.NodeId</MudText></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Display Name</strong></td>
+                            <td>@_selectedNode.DisplayName</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Browse Name</strong></td>
+                            <td>@_selectedNode.BrowseName</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Description</strong></td>
+                            <td>@(_selectedNode.Description ?? "-")</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Node Class</strong></td>
+                            <td><MudChip T="string" Size="Size.Small" Color="@GetNodeClassColor(_selectedNode.NodeClass)">@_selectedNode.NodeClass</MudChip></td>
+                        </tr>
+                        @if (_selectedNode.NodeClass == OpcUaNodeClass.Variable)
+                        {
+                            <tr>
+                                <td><strong>Data Type</strong></td>
+                                <td><MudChip T="string" Size="Size.Small" Color="Color.Info">@_selectedNode.DataType</MudChip></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Value</strong></td>
+                                <td>
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudText Typo="Typo.body2" Style="font-family: monospace;">@(_selectedNode.Value?.ToString() ?? "null")</MudText>
+                                        @if (_selectedNode.IsWritable)
+                                        {
+                                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" 
+                                                           Color="Color.Primary" OnClick="OpenWriteValueDialog" />
+                                        }
+                                    </MudStack>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Writable</strong></td>
+                                <td>
+                                    @if (_selectedNode.IsWritable)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Close" Color="Color.Error" Size="Size.Small" />
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        <tr>
+                            <td><strong>Parent ID</strong></td>
+                            <td><MudText Typo="Typo.body2" Style="font-family: monospace;">@(_selectedNode.ParentNodeId ?? "None (Root)")</MudText></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Children</strong></td>
+                            <td>@_selectedNode.Children.Count</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Created</strong></td>
+                            <td>@_selectedNode.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Updated</strong></td>
+                            <td>@_selectedNode.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        </tr>
+                    </tbody>
+                </MudSimpleTable>
+            </MudPaper>
+        }
+        else
+        {
+            <MudPaper Class="pa-8" Elevation="2">
+                <MudStack AlignItems="AlignItems.Center" Spacing="4">
+                    <MudIcon Icon="@Icons.Material.Filled.AccountTree" Size="Size.Large" Color="Color.Default" />
+                    <MudText Typo="Typo.h6" Color="Color.Default">Select a node to view details</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Default">Click on any node in the tree view to see its properties</MudText>
+                </MudStack>
+            </MudPaper>
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<OpcUaNode> _rootNodes = [];
+    private OpcUaNode? _selectedNode;
+    private HashSet<string> _expandedNodes = [];
+
+    protected override void OnInitialized()
+    {
+        RefreshNodes();
+        
+        NodeService.NodeCreated += OnNodeChanged;
+        NodeService.NodeUpdated += OnNodeChanged;
+        NodeService.NodeDeleted += OnNodeDeleted;
+    }
+
+    private RenderFragment RenderNodeTree(OpcUaNode node, int level) => __builder =>
+    {
+        var isExpanded = _expandedNodes.Contains(node.NodeId);
+        var isSelected = _selectedNode?.NodeId == node.NodeId;
+        var hasChildren = node.Children.Count > 0;
+        
+        <div style="padding-left: @(level * 20)px;">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="@(isSelected ? "mud-primary-text" : "")" 
+                      Style="@(isSelected ? "background-color: var(--mud-palette-primary-lighten); border-radius: 4px; padding: 4px;" : "padding: 4px;")">
+                @if (hasChildren)
+                {
+                    <MudIconButton Icon="@(isExpanded ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" 
+                                   Size="Size.Small" OnClick="@(() => ToggleExpand(node.NodeId))" />
+                }
+                else
+                {
+                    <div style="width: 40px;"></div>
+                }
+                <MudIcon Icon="@GetNodeIcon(node)" Color="@GetNodeColor(node)" Size="Size.Small" Class="mr-2" />
+                <MudLink Color="@(isSelected ? Color.Primary : Color.Default)" OnClick="@(() => SelectNode(node))" Style="flex-grow: 1; cursor: pointer;">
+                    @node.DisplayName
+                </MudLink>
+                @if (isSelected)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" 
+                                   OnClick="@(() => OpenCreateDialog(node))" Title="Add child node" />
+                }
+            </MudStack>
+        </div>
+        
+        @if (isExpanded && hasChildren)
+        {
+            foreach (var child in node.Children)
+            {
+                @RenderNodeTree(child, level + 1)
+            }
+        }
+    };
+
+    private void ToggleExpand(string nodeId)
+    {
+        if (_expandedNodes.Contains(nodeId))
+        {
+            _expandedNodes.Remove(nodeId);
+        }
+        else
+        {
+            _expandedNodes.Add(nodeId);
+        }
+    }
+
+    private void RefreshNodes()
+    {
+        _rootNodes = NodeService.GetRootNodes().ToList();
+        
+        if (_selectedNode != null)
+        {
+            _selectedNode = NodeService.GetNode(_selectedNode.NodeId);
+        }
+        
+        StateHasChanged();
+    }
+
+    private void OnNodeChanged(object? sender, OpcUaNode node)
+    {
+        InvokeAsync(() =>
+        {
+            RefreshNodes();
+        });
+    }
+
+    private void OnNodeDeleted(object? sender, string nodeId)
+    {
+        InvokeAsync(() =>
+        {
+            if (_selectedNode?.NodeId == nodeId)
+            {
+                _selectedNode = null;
+            }
+            RefreshNodes();
+        });
+    }
+
+    private void SelectNode(OpcUaNode node)
+    {
+        _selectedNode = node;
+    }
+
+    private string GetNodeIcon(OpcUaNode node)
+    {
+        return node.NodeClass switch
+        {
+            OpcUaNodeClass.Object => Icons.Material.Filled.Folder,
+            OpcUaNodeClass.Variable => Icons.Material.Filled.DataObject,
+            OpcUaNodeClass.Method => Icons.Material.Filled.Functions,
+            _ => Icons.Material.Filled.Circle
+        };
+    }
+
+    private Color GetNodeColor(OpcUaNode node)
+    {
+        return node.NodeClass switch
+        {
+            OpcUaNodeClass.Object => Color.Warning,
+            OpcUaNodeClass.Variable => Color.Primary,
+            OpcUaNodeClass.Method => Color.Secondary,
+            _ => Color.Default
+        };
+    }
+
+    private Color GetNodeClassColor(OpcUaNodeClass nodeClass)
+    {
+        return nodeClass switch
+        {
+            OpcUaNodeClass.Object => Color.Warning,
+            OpcUaNodeClass.Variable => Color.Primary,
+            OpcUaNodeClass.Method => Color.Secondary,
+            _ => Color.Default
+        };
+    }
+
+    private async Task OpenCreateDialog(OpcUaNode? parent)
+    {
+        var parameters = new DialogParameters<NodeEditorDialog>
+        {
+            { x => x.ParentNode, parent },
+            { x => x.IsEdit, false }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<NodeEditorDialog>("Create New Node", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            // Auto-expand the parent
+            if (parent != null)
+            {
+                _expandedNodes.Add(parent.NodeId);
+            }
+            RefreshNodes();
+            Snackbar.Add("Node created successfully", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditDialog()
+    {
+        if (_selectedNode == null) return;
+
+        var parameters = new DialogParameters<NodeEditorDialog>
+        {
+            { x => x.EditNode, _selectedNode },
+            { x => x.IsEdit, true }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<NodeEditorDialog>("Edit Node", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            RefreshNodes();
+            Snackbar.Add("Node updated successfully", Severity.Success);
+        }
+    }
+
+    private async Task OpenWriteValueDialog()
+    {
+        if (_selectedNode == null || !_selectedNode.IsWritable) return;
+
+        var parameters = new DialogParameters<WriteValueDialog>
+        {
+            { x => x.Node, _selectedNode }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<WriteValueDialog>("Write Value", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            RefreshNodes();
+            Snackbar.Add("Value written successfully", Severity.Success);
+        }
+    }
+
+    private async Task DeleteSelectedNode()
+    {
+        if (_selectedNode == null) return;
+
+        var confirmed = await DialogService.ShowMessageBox(
+            "Confirm Delete",
+            $"Are you sure you want to delete '{_selectedNode.DisplayName}'? This will also delete all child nodes.",
+            yesText: "Delete",
+            cancelText: "Cancel"
+        );
+
+        if (confirmed == true)
+        {
+            NodeService.DeleteNode(_selectedNode.NodeId);
+            _selectedNode = null;
+            RefreshNodes();
+            Snackbar.Add("Node deleted successfully", Severity.Success);
+        }
+    }
+
+    public void Dispose()
+    {
+        NodeService.NodeCreated -= OnNodeChanged;
+        NodeService.NodeUpdated -= OnNodeChanged;
+        NodeService.NodeDeleted -= OnNodeDeleted;
+    }
+}

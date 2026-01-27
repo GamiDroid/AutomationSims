@@ -1,0 +1,182 @@
+@using OpcUaServer.Web.Models
+@using OpcUaServer.Web.Services
+@inject OpcUaNodeService NodeService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@(IsEdit ? Icons.Material.Filled.Edit : Icons.Material.Filled.Add)" Class="mr-2" />
+            @(IsEdit ? "Edit Node" : "Create New Node")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudStack Spacing="3">
+                @if (!IsEdit && ParentNode != null)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">
+                        Creating child node under: <strong>@ParentNode.DisplayName</strong>
+                    </MudAlert>
+                }
+
+                <MudTextField @bind-Value="_displayName" Label="Display Name" Required="true"
+                              RequiredError="Display name is required" Variant="Variant.Outlined" />
+
+                <MudTextField @bind-Value="_browseName" Label="Browse Name" 
+                              HelperText="Optional, defaults to display name without spaces"
+                              Variant="Variant.Outlined" />
+
+                <MudTextField @bind-Value="_description" Label="Description" Lines="2"
+                              Variant="Variant.Outlined" />
+
+                <MudSelect T="OpcUaNodeClass" @bind-Value="_nodeClass" Label="Node Class" 
+                           Variant="Variant.Outlined" Required="true" Disabled="@IsEdit">
+                    <MudSelectItem Value="OpcUaNodeClass.Object">Object (Folder)</MudSelectItem>
+                    <MudSelectItem Value="OpcUaNodeClass.Variable">Variable (Tag)</MudSelectItem>
+                </MudSelect>
+
+                @if (_nodeClass == OpcUaNodeClass.Variable)
+                {
+                    <MudSelect T="OpcUaDataType" @bind-Value="_dataType" Label="Data Type" 
+                               Variant="Variant.Outlined" Required="true" Disabled="@IsEdit">
+                        @foreach (var dt in Enum.GetValues<OpcUaDataType>())
+                        {
+                            <MudSelectItem Value="@dt">@dt</MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudTextField @bind-Value="_initialValue" Label="@(IsEdit ? "Value" : "Initial Value")"
+                                  HelperText="@GetValueHelperText()" Variant="Variant.Outlined" />
+
+                    <MudSwitch @bind-Value="_isWritable" Label="Writable" Color="Color.Primary" />
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(!_isValid)">
+            @(IsEdit ? "Save Changes" : "Create Node")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public OpcUaNode? ParentNode { get; set; }
+
+    [Parameter]
+    public OpcUaNode? EditNode { get; set; }
+
+    [Parameter]
+    public bool IsEdit { get; set; }
+
+    private MudForm? _form;
+    private bool _isValid;
+    
+    private string _displayName = string.Empty;
+    private string? _browseName;
+    private string? _description;
+    private OpcUaNodeClass _nodeClass = OpcUaNodeClass.Variable;
+    private OpcUaDataType _dataType = OpcUaDataType.Double;
+    private string? _initialValue;
+    private bool _isWritable = true;
+
+    protected override void OnInitialized()
+    {
+        if (IsEdit && EditNode != null)
+        {
+            _displayName = EditNode.DisplayName;
+            _browseName = EditNode.BrowseName;
+            _description = EditNode.Description;
+            _nodeClass = EditNode.NodeClass;
+            _dataType = EditNode.DataType;
+            _initialValue = EditNode.Value?.ToString();
+            _isWritable = EditNode.IsWritable;
+        }
+    }
+
+    private string GetValueHelperText()
+    {
+        return _dataType switch
+        {
+            OpcUaDataType.Boolean => "Enter 'true' or 'false'",
+            OpcUaDataType.DateTime => "Enter date in ISO format",
+            OpcUaDataType.Guid => "Enter valid GUID",
+            OpcUaDataType.Float or OpcUaDataType.Double => "Enter decimal number",
+            OpcUaDataType.Int16 or OpcUaDataType.Int32 or OpcUaDataType.Int64 or 
+            OpcUaDataType.UInt16 or OpcUaDataType.UInt32 or OpcUaDataType.UInt64 or
+            OpcUaDataType.Byte or OpcUaDataType.SByte => "Enter integer value",
+            _ => "Enter value"
+        };
+    }
+
+    private object? ParseValue()
+    {
+        if (string.IsNullOrWhiteSpace(_initialValue)) return null;
+
+        try
+        {
+            return _dataType switch
+            {
+                OpcUaDataType.Boolean => bool.Parse(_initialValue),
+                OpcUaDataType.SByte => sbyte.Parse(_initialValue),
+                OpcUaDataType.Byte => byte.Parse(_initialValue),
+                OpcUaDataType.Int16 => short.Parse(_initialValue),
+                OpcUaDataType.UInt16 => ushort.Parse(_initialValue),
+                OpcUaDataType.Int32 => int.Parse(_initialValue),
+                OpcUaDataType.UInt32 => uint.Parse(_initialValue),
+                OpcUaDataType.Int64 => long.Parse(_initialValue),
+                OpcUaDataType.UInt64 => ulong.Parse(_initialValue),
+                OpcUaDataType.Float => float.Parse(_initialValue),
+                OpcUaDataType.Double => double.Parse(_initialValue),
+                OpcUaDataType.DateTime => DateTime.Parse(_initialValue),
+                OpcUaDataType.Guid => Guid.Parse(_initialValue),
+                _ => _initialValue
+            };
+        }
+        catch
+        {
+            return _initialValue;
+        }
+    }
+
+    private void Submit()
+    {
+        if (IsEdit && EditNode != null)
+        {
+            var request = new UpdateNodeRequest(
+                DisplayName: _displayName,
+                BrowseName: _browseName,
+                Description: _description,
+                DataType: null, // Don't change data type on edit
+                Value: _nodeClass == OpcUaNodeClass.Variable ? ParseValue() : null,
+                IsWritable: _nodeClass == OpcUaNodeClass.Variable ? _isWritable : null
+            );
+
+            NodeService.UpdateNode(EditNode.NodeId, request);
+        }
+        else
+        {
+            var request = new CreateNodeRequest(
+                DisplayName: _displayName,
+                BrowseName: _browseName,
+                Description: _description,
+                ParentNodeId: ParentNode?.NodeId,
+                NodeClass: _nodeClass,
+                DataType: _dataType,
+                InitialValue: _nodeClass == OpcUaNodeClass.Variable ? ParseValue() : null,
+                IsWritable: _isWritable
+            );
+
+            NodeService.CreateNode(request);
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

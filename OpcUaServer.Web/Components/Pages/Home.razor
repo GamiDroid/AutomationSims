@@ -1,59 +1,249 @@
 ﻿@page "/"
+@using OpcUaServer.Web.Models
+@using OpcUaServer.Web.Services
+@inject OpcUaServerService ServerService
+@inject OpcUaNodeService NodeService
+@inject NavigationManager Navigation
 
-<PageTitle>Home</PageTitle>
+<PageTitle>OPC UA Server Dashboard</PageTitle>
 
-<MudText Typo="Typo.h3" GutterBottom="true">Hello, world!</MudText>
-<MudText Class="mb-8">Welcome to your new app, powered by MudBlazor and the .NET 9 Template!</MudText>
+<MudText Typo="Typo.h4" Class="mb-4">OPC UA Server Dashboard</MudText>
 
-<MudAlert Severity="Severity.Normal" ContentAlignment="HorizontalAlignment.Start">
-    You can find documentation and examples on our website here:
-    <MudLink Href="https://mudblazor.com" Target="_blank" Typo="Typo.body2" Color="Color.Primary">
-        <b>www.mudblazor.com</b>
-    </MudLink>
-</MudAlert>
+<MudGrid>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack AlignItems="AlignItems.Center">
+                <MudIcon Icon="@(ServerService.IsRunning ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Error)" 
+                         Size="Size.Large" Color="@(ServerService.IsRunning ? Color.Success : Color.Error)" />
+                <MudText Typo="Typo.h6">Server Status</MudText>
+                <MudChip T="string" Color="@(ServerService.IsRunning ? Color.Success : Color.Error)" Size="Size.Small">
+                    @(ServerService.IsRunning ? "Running" : "Stopped")
+                </MudChip>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
 
-<br />
-<MudText Typo="Typo.h5" GutterBottom="true">Interactivity in this Template</MudText>
-<br />
-<MudText Typo="Typo.body2">
-    When you opt for the "Global" Interactivity Location, <br />
-    the render modes are defined in App.razor and consequently apply to all child components.<br />
-    In this case, providers are globally set in the MainLayout.<br />
-    <br />
-    On the other hand, if you choose the "Per page/component" Interactivity Location,<br />
-    it is necessary to include the <br />
-    <br />
-    &lt;MudPopoverProvider /&gt; <br />
-    &lt;MudDialogProvider /&gt; <br />
-    &lt;MudSnackbarProvider /&gt; <br />
-    <br />
-    components on every interactive page.<br />
-    <br />
-    If a render mode is not specified for a page, it defaults to Server-Side Rendering (SSR),<br />
-    similar to this page. While MudBlazor allows pages to be rendered in SSR,<br />
-    please note that interactive features, such as buttons and dropdown menus, will not be functional.
-</MudText>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack AlignItems="AlignItems.Center">
+                <MudIcon Icon="@Icons.Material.Filled.AccountTree" Size="Size.Large" Color="Color.Primary" />
+                <MudText Typo="Typo.h6">Total Nodes</MudText>
+                <MudText Typo="Typo.h4" Color="Color.Primary">@NodeService.GetTotalNodeCount()</MudText>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
 
-<br />
-<MudText Typo="Typo.h5" GutterBottom="true">What's New in Blazor with the Release of .NET 9</MudText>
-<br />
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack AlignItems="AlignItems.Center">
+                <MudIcon Icon="@Icons.Material.Filled.DataObject" Size="Size.Large" Color="Color.Info" />
+                <MudText Typo="Typo.h6">Variables</MudText>
+                <MudText Typo="Typo.h4" Color="Color.Info">@GetVariableCount()</MudText>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
 
-<MudText Typo="Typo.h6" GutterBottom="true">Prerendering</MudText>
-<MudText Typo="Typo.body2" GutterBottom="true">
-    If you're exploring the features of .NET 9 Blazor,<br /> you might be pleasantly surprised to learn that each page is prerendered on the server,<br /> regardless of the selected render mode.<br /><br />
-    This means that you'll need to inject all necessary services on the server,<br /> even when opting for the wasm (WebAssembly) render mode.<br /><br />
-    This prerendering functionality is crucial to ensuring that WebAssembly mode feels fast and responsive,<br /> especially when it comes to initial page load times.<br /><br />
-    For more information on how to detect prerendering and leverage the RenderContext, you can refer to the following link:
-    <MudLink Href="https://github.com/dotnet/aspnetcore/issues/51468#issuecomment-1783568121" Target="_blank" Typo="Typo.body2" Color="Color.Primary">
-        More details
-    </MudLink>
-</MudText>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack AlignItems="AlignItems.Center">
+                <MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Large" Color="Color.Warning" />
+                <MudText Typo="Typo.h6">Objects</MudText>
+                <MudText Typo="Typo.h4" Color="Color.Warning">@GetObjectCount()</MudText>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
 
-<br />
-<MudText Typo="Typo.h6" GutterBottom="true">InteractiveAuto</MudText>
-<MudText Typo="Typo.body2">
-    A discussion on how to achieve this can be found here:
-    <MudLink Href="https://github.com/dotnet/aspnetcore/issues/51468#issue-1950424116" Target="_blank" Typo="Typo.body2" Color="Color.Primary">
-        More details
-    </MudLink>
-</MudText>
+<MudGrid Class="mt-4">
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-4">Server Information</MudText>
+            <MudSimpleTable Dense="true" Bordered="true">
+                <tbody>
+                    <tr>
+                        <td><strong>Server URI</strong></td>
+                        <td>
+                            <MudText Typo="Typo.body2" Style="font-family: monospace;">@ServerService.ServerUri</MudText>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Start Time</strong></td>
+                        <td>@(ServerService.IsRunning ? ServerService.StartTime.ToString("yyyy-MM-dd HH:mm:ss") : "-")</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Uptime</strong></td>
+                        <td>@GetUptime()</td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-4">Quick Actions</MudText>
+            <MudStack Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.AccountTree" OnClick="@(() => Navigation.NavigateTo("/nodes"))">
+                    Browse Nodes
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Secondary" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Monitor" OnClick="@(() => Navigation.NavigateTo("/monitor"))">
+                    Monitor Values
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Api" Href="/api/opcua/status" Target="_blank">
+                    API Status
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-4">Recent Nodes</MudText>
+            <MudTable Items="@GetRecentNodes()" Hover="true" Striped="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>Display Name</MudTh>
+                    <MudTh>Node Class</MudTh>
+                    <MudTh>Data Type</MudTh>
+                    <MudTh>Value</MudTh>
+                    <MudTh>Updated</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Display Name">@context.DisplayName</MudTd>
+                    <MudTd DataLabel="Node Class">
+                        <MudChip T="string" Size="Size.Small" Color="@GetNodeClassColor(context.NodeClass)">@context.NodeClass</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Data Type">
+                        @if (context.NodeClass == OpcUaNodeClass.Variable)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info">@context.DataType</MudChip>
+                        }
+                        else
+                        {
+                            <MudText>-</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Value">
+                        <MudText Typo="Typo.body2" Style="font-family: monospace;">
+                            @(context.NodeClass == OpcUaNodeClass.Variable ? (context.Value?.ToString() ?? "null") : "-")
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Updated">@context.UpdatedAt.ToString("HH:mm:ss")</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-4">API Endpoints</MudText>
+            <MudText Typo="Typo.body2" Class="mb-2">
+                The following REST API endpoints are available for external applications:
+            </MudText>
+            <MudSimpleTable Dense="true" Bordered="true" Striped="true">
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>Endpoint</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><MudChip T="string" Size="Size.Small" Color="Color.Info">GET</MudChip></td>
+                        <td><code>/api/opcua/status</code></td>
+                        <td>Get server status</td>
+                    </tr>
+                    <tr>
+                        <td><MudChip T="string" Size="Size.Small" Color="Color.Info">GET</MudChip></td>
+                        <td><code>/api/opcua/nodes</code></td>
+                        <td>Get all nodes</td>
+                    </tr>
+                    <tr>
+                        <td><MudChip T="string" Size="Size.Small" Color="Color.Info">GET</MudChip></td>
+                        <td><code>/api/opcua/nodes/tree</code></td>
+                        <td>Get nodes as tree structure</td>
+                    </tr>
+                    <tr>
+                        <td><MudChip T="string" Size="Size.Small" Color="Color.Info">GET</MudChip></td>
+                        <td><code>/api/opcua/nodes/{'{'}nodeId{'}'}</code></td>
+                        <td>Get single node</td>
+                    </tr>
+                    <tr>
+                        <td><MudChip T="string" Size="Size.Small" Color="Color.Success">POST</MudChip></td>
+                        <td><code>/api/opcua/nodes</code></td>
+                        <td>Create new node</td>
+                    </tr>
+                    <tr>
+                        <td><MudChip T="string" Size="Size.Small" Color="Color.Warning">PUT</MudChip></td>
+                        <td><code>/api/opcua/nodes/{'{'}nodeId{'}'}</code></td>
+                        <td>Update node</td>
+                    </tr>
+                    <tr>
+                        <td><MudChip T="string" Size="Size.Small" Color="Color.Error">DELETE</MudChip></td>
+                        <td><code>/api/opcua/nodes/{'{'}nodeId{'}'}</code></td>
+                        <td>Delete node</td>
+                    </tr>
+                    <tr>
+                        <td><MudChip T="string" Size="Size.Small" Color="Color.Success">POST</MudChip></td>
+                        <td><code>/api/opcua/nodes/{'{'}nodeId{'}'}/move</code></td>
+                        <td>Move node to new parent</td>
+                    </tr>
+                    <tr>
+                        <td><MudChip T="string" Size="Size.Small" Color="Color.Info">GET</MudChip></td>
+                        <td><code>/api/opcua/nodes/{'{'}nodeId{'}'}/value</code></td>
+                        <td>Read node value</td>
+                    </tr>
+                    <tr>
+                        <td><MudChip T="string" Size="Size.Small" Color="Color.Success">POST</MudChip></td>
+                        <td><code>/api/opcua/nodes/{'{'}nodeId{'}'}/value</code></td>
+                        <td>Write node value</td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private int GetVariableCount()
+    {
+        return NodeService.GetAllNodes().Count(n => n.NodeClass == OpcUaNodeClass.Variable);
+    }
+
+    private int GetObjectCount()
+    {
+        return NodeService.GetAllNodes().Count(n => n.NodeClass == OpcUaNodeClass.Object);
+    }
+
+    private string GetUptime()
+    {
+        if (!ServerService.IsRunning) return "-";
+        var uptime = DateTime.UtcNow - ServerService.StartTime;
+        return $"{(int)uptime.TotalHours}h {uptime.Minutes}m {uptime.Seconds}s";
+    }
+
+    private IEnumerable<OpcUaNode> GetRecentNodes()
+    {
+        return NodeService.GetAllNodes()
+            .OrderByDescending(n => n.UpdatedAt)
+            .Take(5);
+    }
+
+    private Color GetNodeClassColor(OpcUaNodeClass nodeClass)
+    {
+        return nodeClass switch
+        {
+            OpcUaNodeClass.Object => Color.Warning,
+            OpcUaNodeClass.Variable => Color.Primary,
+            OpcUaNodeClass.Method => Color.Secondary,
+            _ => Color.Default
+        };
+    }
+}

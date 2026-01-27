@@ -1,0 +1,325 @@
+@page "/monitor"
+@using OpcUaServer.Web.Models
+@using OpcUaServer.Web.Services
+@inject OpcUaNodeService NodeService
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<PageTitle>Node Monitor</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">OPC UA Node Monitor</MudText>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row="true" Class="mb-4" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.h6">Monitored Nodes</MudText>
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="OpenAddNodeDialog">
+                        Add Node
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="@(_isMonitoring ? Color.Error : Color.Success)" 
+                               StartIcon="@(_isMonitoring ? Icons.Material.Filled.Stop : Icons.Material.Filled.PlayArrow)"
+                               OnClick="ToggleMonitoring">
+                        @(_isMonitoring ? "Stop" : "Start")
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+
+            @if (_isMonitoring)
+            {
+                <MudAlert Severity="Severity.Success" Dense="true" Class="mb-4">
+                    <MudStack Row="true" AlignItems="AlignItems.Center">
+                        <MudProgressCircular Color="Color.Success" Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <MudText>Monitoring active - Refreshing every @(_refreshInterval / 1000) seconds</MudText>
+                    </MudStack>
+                </MudAlert>
+            }
+
+            @if (_monitoredNodes.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">
+                    No nodes are being monitored. Click "Add Node" to start monitoring.
+                </MudAlert>
+            }
+            else
+            {
+                <MudTable Items="@_monitoredNodes" Hover="true" Striped="true" Dense="true" Bordered="true">
+                    <HeaderContent>
+                        <MudTh>Display Name</MudTh>
+                        <MudTh>Node ID</MudTh>
+                        <MudTh>Data Type</MudTh>
+                        <MudTh>Value</MudTh>
+                        <MudTh>Last Updated</MudTh>
+                        <MudTh Style="width: 100px;">Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Display Name">
+                            <MudStack Row="true" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.DataObject" Color="Color.Primary" Size="Size.Small" Class="mr-2" />
+                                @context.DisplayName
+                            </MudStack>
+                        </MudTd>
+                        <MudTd DataLabel="Node ID">
+                            <MudText Typo="Typo.body2" Style="font-family: monospace;">@context.NodeId</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Data Type">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info">@context.DataType</MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Value">
+                            <MudText Typo="Typo.body2" Style="font-family: monospace; font-weight: bold;" 
+                                     Color="@(HasValueChanged(context.NodeId) ? Color.Success : Color.Default)">
+                                @FormatValue(context.Value)
+                            </MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Last Updated">
+                            <MudText Typo="Typo.body2">@context.Timestamp.ToString("HH:mm:ss.fff")</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Actions">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                           OnClick="@(() => RemoveMonitoredNode(context.NodeId))" Title="Remove from monitor" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-4">Value History</MudText>
+            @if (_valueHistory.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Default">No value changes recorded yet.</MudText>
+            }
+            else
+            {
+                <MudList T="string" Dense="true" Style="max-height: 300px; overflow-y: auto;">
+                    @foreach (var entry in _valueHistory.TakeLast(50).Reverse())
+                    {
+                        <MudListItem T="string">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Style="width: 100%;">
+                                <MudText Typo="Typo.caption" Color="Color.Default" Style="width: 100px;">
+                                    @entry.Timestamp.ToString("HH:mm:ss.fff")
+                                </MudText>
+                                <MudText Typo="Typo.body2" Style="flex-grow: 1;">
+                                    <strong>@entry.DisplayName</strong>: @entry.OldValue ? @entry.NewValue
+                                </MudText>
+                            </MudStack>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-4">Monitor Settings</MudText>
+            <MudStack Spacing="3">
+                <MudSlider @bind-Value="_refreshInterval" Min="500" Max="5000" Step="500" Color="Color.Primary">
+                    Refresh Interval: @(_refreshInterval / 1000.0)s
+                </MudSlider>
+                
+                <MudSwitch @bind-Value="_showChangeHighlight" Label="Highlight value changes" Color="Color.Primary" />
+                
+                <MudButton Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Filled.Clear"
+                           OnClick="ClearHistory" Disabled="@(_valueHistory.Count == 0)">
+                    Clear History
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudDialog @bind-Visible="_showAddDialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Add" Class="mr-2" />
+            Add Node to Monitor
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudSelect T="OpcUaNode" Label="Select Node" @bind-Value="_selectedNodeToAdd" Variant="Variant.Outlined"
+                   ToStringFunc="@(n => n?.DisplayName ?? "")">
+            @foreach (var node in GetAvailableNodes())
+            {
+                <MudSelectItem Value="@node">
+                    @node.DisplayName (@node.DataType)
+                </MudSelectItem>
+            }
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showAddDialog = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AddSelectedNode" 
+                   Disabled="@(_selectedNodeToAdd == null)">
+            Add to Monitor
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<MonitoredNodeValue> _monitoredNodes = [];
+    private HashSet<string> _monitoredNodeIds = [];
+    private List<ValueChangeEntry> _valueHistory = [];
+    private Dictionary<string, object?> _previousValues = new();
+    private HashSet<string> _changedNodeIds = [];
+    
+    private bool _isMonitoring;
+    private int _refreshInterval = 1000;
+    private bool _showChangeHighlight = true;
+    private Timer? _timer;
+    
+    private bool _showAddDialog;
+    private OpcUaNode? _selectedNodeToAdd;
+
+    protected override void OnInitialized()
+    {
+        NodeService.NodeValueChanged += OnNodeValueChanged;
+        
+        // Add some default nodes to monitor
+        var sampleNodes = NodeService.GetAllNodes()
+            .Where(n => n.NodeClass == OpcUaNodeClass.Variable)
+            .Take(3);
+            
+        foreach (var node in sampleNodes)
+        {
+            _monitoredNodeIds.Add(node.NodeId);
+        }
+        
+        RefreshMonitoredValues();
+    }
+
+    private void OnNodeValueChanged(object? sender, (OpcUaNode Node, object? OldValue, object? NewValue) args)
+    {
+        if (_monitoredNodeIds.Contains(args.Node.NodeId))
+        {
+            InvokeAsync(() =>
+            {
+                _valueHistory.Add(new ValueChangeEntry(
+                    args.Node.NodeId,
+                    args.Node.DisplayName,
+                    args.OldValue?.ToString() ?? "null",
+                    args.NewValue?.ToString() ?? "null",
+                    DateTime.UtcNow
+                ));
+                
+                if (_showChangeHighlight)
+                {
+                    _changedNodeIds.Add(args.Node.NodeId);
+                }
+                
+                RefreshMonitoredValues();
+            });
+        }
+    }
+
+    private void RefreshMonitoredValues()
+    {
+        _monitoredNodes = _monitoredNodeIds
+            .Select(id => NodeService.GetNode(id))
+            .Where(n => n != null)
+            .Select(n => new MonitoredNodeValue(
+                n!.NodeId,
+                n.DisplayName,
+                n.Value,
+                n.DataType,
+                n.UpdatedAt
+            ))
+            .ToList();
+            
+        StateHasChanged();
+    }
+
+    private void ToggleMonitoring()
+    {
+        _isMonitoring = !_isMonitoring;
+        
+        if (_isMonitoring)
+        {
+            StartTimer();
+        }
+        else
+        {
+            StopTimer();
+        }
+    }
+
+    private void StartTimer()
+    {
+        StopTimer();
+        _timer = new Timer(_ =>
+        {
+            InvokeAsync(() =>
+            {
+                _changedNodeIds.Clear();
+                RefreshMonitoredValues();
+            });
+        }, null, 0, _refreshInterval);
+    }
+
+    private void StopTimer()
+    {
+        _timer?.Dispose();
+        _timer = null;
+    }
+
+    private void OpenAddNodeDialog()
+    {
+        _selectedNodeToAdd = null;
+        _showAddDialog = true;
+    }
+
+    private IEnumerable<OpcUaNode> GetAvailableNodes()
+    {
+        return NodeService.GetAllNodes()
+            .Where(n => n.NodeClass == OpcUaNodeClass.Variable && !_monitoredNodeIds.Contains(n.NodeId));
+    }
+
+    private void AddSelectedNode()
+    {
+        if (_selectedNodeToAdd != null)
+        {
+            _monitoredNodeIds.Add(_selectedNodeToAdd.NodeId);
+            RefreshMonitoredValues();
+            Snackbar.Add($"Added '{_selectedNodeToAdd.DisplayName}' to monitor", Severity.Success);
+        }
+        _showAddDialog = false;
+    }
+
+    private void RemoveMonitoredNode(string nodeId)
+    {
+        _monitoredNodeIds.Remove(nodeId);
+        _previousValues.Remove(nodeId);
+        RefreshMonitoredValues();
+    }
+
+    private bool HasValueChanged(string nodeId)
+    {
+        return _showChangeHighlight && _changedNodeIds.Contains(nodeId);
+    }
+
+    private string FormatValue(object? value)
+    {
+        if (value == null) return "null";
+        if (value is bool b) return b ? "true" : "false";
+        if (value is double d) return d.ToString("F4");
+        if (value is float f) return f.ToString("F4");
+        return value.ToString() ?? "null";
+    }
+
+    private void ClearHistory()
+    {
+        _valueHistory.Clear();
+    }
+
+    public void Dispose()
+    {
+        StopTimer();
+        NodeService.NodeValueChanged -= OnNodeValueChanged;
+    }
+
+    private record ValueChangeEntry(string NodeId, string DisplayName, string OldValue, string NewValue, DateTime Timestamp);
+}

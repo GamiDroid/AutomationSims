@@ -1,0 +1,138 @@
+@using OpcUaServer.Web.Models
+@using OpcUaServer.Web.Services
+@inject OpcUaNodeService NodeService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-2" />
+            Write Value
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudAlert Severity="Severity.Info" Dense="true">
+                Writing to: <strong>@Node?.DisplayName</strong>
+            </MudAlert>
+
+            <MudText Typo="Typo.body2">
+                <strong>Node ID:</strong> @Node?.NodeId
+            </MudText>
+
+            <MudText Typo="Typo.body2">
+                <strong>Data Type:</strong> <MudChip T="string" Size="Size.Small" Color="Color.Info">@Node?.DataType</MudChip>
+            </MudText>
+
+            <MudText Typo="Typo.body2">
+                <strong>Current Value:</strong> @(Node?.Value?.ToString() ?? "null")
+            </MudText>
+
+            <MudDivider />
+
+            @if (Node?.DataType == OpcUaDataType.Boolean)
+            {
+                <MudSwitch @bind-Value="_boolValue" Label="Value" Color="Color.Primary" />
+            }
+            else
+            {
+                <MudTextField @bind-Value="_textValue" Label="New Value" Variant="Variant.Outlined"
+                              HelperText="@GetHelperText()" Required="true" />
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">
+            Write Value
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public OpcUaNode? Node { get; set; }
+
+    private string? _textValue;
+    private bool _boolValue;
+
+    protected override void OnInitialized()
+    {
+        if (Node != null)
+        {
+            if (Node.DataType == OpcUaDataType.Boolean)
+            {
+                _boolValue = Node.Value is bool b && b;
+            }
+            else
+            {
+                _textValue = Node.Value?.ToString();
+            }
+        }
+    }
+
+    private string GetHelperText()
+    {
+        return Node?.DataType switch
+        {
+            OpcUaDataType.DateTime => "Enter date in ISO format (e.g., 2024-01-15T10:30:00)",
+            OpcUaDataType.Guid => "Enter valid GUID",
+            OpcUaDataType.Float or OpcUaDataType.Double => "Enter decimal number",
+            OpcUaDataType.Int16 or OpcUaDataType.Int32 or OpcUaDataType.Int64 or
+            OpcUaDataType.UInt16 or OpcUaDataType.UInt32 or OpcUaDataType.UInt64 or
+            OpcUaDataType.Byte or OpcUaDataType.SByte => "Enter integer value",
+            _ => "Enter new value"
+        };
+    }
+
+    private object? ParseValue()
+    {
+        if (Node?.DataType == OpcUaDataType.Boolean)
+        {
+            return _boolValue;
+        }
+
+        if (string.IsNullOrWhiteSpace(_textValue)) return null;
+
+        try
+        {
+            return Node?.DataType switch
+            {
+                OpcUaDataType.SByte => sbyte.Parse(_textValue),
+                OpcUaDataType.Byte => byte.Parse(_textValue),
+                OpcUaDataType.Int16 => short.Parse(_textValue),
+                OpcUaDataType.UInt16 => ushort.Parse(_textValue),
+                OpcUaDataType.Int32 => int.Parse(_textValue),
+                OpcUaDataType.UInt32 => uint.Parse(_textValue),
+                OpcUaDataType.Int64 => long.Parse(_textValue),
+                OpcUaDataType.UInt64 => ulong.Parse(_textValue),
+                OpcUaDataType.Float => float.Parse(_textValue),
+                OpcUaDataType.Double => double.Parse(_textValue),
+                OpcUaDataType.DateTime => DateTime.Parse(_textValue),
+                OpcUaDataType.Guid => Guid.Parse(_textValue),
+                _ => _textValue
+            };
+        }
+        catch
+        {
+            return _textValue;
+        }
+    }
+
+    private void Submit()
+    {
+        if (Node == null) return;
+
+        var value = ParseValue();
+        if (value != null)
+        {
+            NodeService.WriteValue(Node.NodeId, value);
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

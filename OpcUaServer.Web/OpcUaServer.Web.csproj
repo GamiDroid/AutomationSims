@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="MudBlazor" Version="8.*" />
+    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua" Version="1.*" />
   </ItemGroup>
 
 
