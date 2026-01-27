@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="AutomationSims.AppHost/AutomationSims.AppHost.csproj" />
+  <Project Path="AutomationSims.ServiceDefaults/AutomationSims.ServiceDefaults.csproj" />
+  <Project Path="OpcUaServer.Web/OpcUaServer.Web.csproj" />
+</Solution>
