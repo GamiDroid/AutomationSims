@@ -1,0 +1,46 @@
+@CoffeeMaker.Api_HostAddress = http://localhost:5102
+
+GET {{CoffeeMaker.Api_HostAddress}}/coffeemaker/graph
+Accept: text/plain
+
+###
+
+GET {{CoffeeMaker.Api_HostAddress}}/coffeemaker/state
+Accept: text/plain
+
+###
+
+GET {{CoffeeMaker.Api_HostAddress}}/coffeemaker/permitted-triggers
+Accept: application/json
+
+###
+
+PUT {{CoffeeMaker.Api_HostAddress}}/coffeemaker/trigger/turnOn
+Accept: text/plain
+
+###
+
+PUT {{CoffeeMaker.Api_HostAddress}}/coffeemaker/trigger/brew
+Accept: text/plain
+
+###
+
+PUT {{CoffeeMaker.Api_HostAddress}}/coffeemaker/trigger/cancelbrew
+Accept: text/plain
+
+###
+
+PUT {{CoffeeMaker.Api_HostAddress}}/coffeemaker/trigger/milkFrothing
+Accept: text/plain
+
+###
+
+PUT {{CoffeeMaker.Api_HostAddress}}/coffeemaker/trigger/clean
+Accept: text/plain
+
+###
+
+PUT {{CoffeeMaker.Api_HostAddress}}/coffeemaker/state/cleaning
+Accept: text/plain
+
+###

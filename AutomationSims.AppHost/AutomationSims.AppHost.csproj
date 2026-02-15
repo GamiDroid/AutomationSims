@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CoffeeMaker.Api\CoffeeMaker.Api.csproj" />
     <ProjectReference Include="..\OpcUaServer.Web\OpcUaServer.Web.csproj" />
   </ItemGroup>
 

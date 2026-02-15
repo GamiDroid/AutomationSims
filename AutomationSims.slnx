@@ -1,5 +1,7 @@
 <Solution>
   <Project Path="AutomationSims.AppHost/AutomationSims.AppHost.csproj" />
   <Project Path="AutomationSims.ServiceDefaults/AutomationSims.ServiceDefaults.csproj" />
+  <Project Path="CoffeeMaker.Api/CoffeeMaker.Api.csproj" />
+  <Project Path="Mqtt.Common/Mqtt.Common.csproj" Id="fe701e32-e79e-4ba5-8715-5af3d060859f" />
   <Project Path="OpcUaServer.Web/OpcUaServer.Web.csproj" />
 </Solution>
