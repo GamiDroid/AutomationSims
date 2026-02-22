@@ -63,9 +63,21 @@ public class MqttConnection : IMqttConnection, IAsyncDisposable
         throw new NotImplementedException();
     }
 
-    public Task StartAsync(CancellationToken ct)
+    public async Task StartAsync(CancellationToken ct)
     {
-        return _client.ConnectAsync(_options, ct);
+        try
+        {
+            await _client.ConnectAsync(_options, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // Handle cancellation if needed
+        }
+        catch (Exception ex)
+        {
+            // Handle connection exceptions if needed
+            Console.WriteLine($"Error connecting to MQTT broker: {ex.Message}");
+        }
     }
 
     public Task StopAsync(CancellationToken ct)
