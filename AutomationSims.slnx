@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
   <Project Path="AutomationSims.AppHost/AutomationSims.AppHost.csproj" />
   <Project Path="AutomationSims.ServiceDefaults/AutomationSims.ServiceDefaults.csproj" />
   <Project Path="CoffeeMaker.Api/CoffeeMaker.Api.csproj" />

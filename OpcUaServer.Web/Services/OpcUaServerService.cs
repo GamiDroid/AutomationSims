@@ -36,7 +36,7 @@ public class OpcUaServerService : IHostedService, IDisposable
             _logger.LogInformation("Starting OPC UA Server...");
 
             // Create certificate directories if they don't exist
-            var pkiRoot = Path.Combine(Directory.GetCurrentDirectory(), "pki");
+            var pkiRoot = Path.Combine(Path.GetTempPath(), "pki");
             Directory.CreateDirectory(Path.Combine(pkiRoot, "own", "certs"));
             Directory.CreateDirectory(Path.Combine(pkiRoot, "own", "private"));
             Directory.CreateDirectory(Path.Combine(pkiRoot, "issuer", "certs"));
@@ -82,8 +82,8 @@ public class OpcUaServerService : IHostedService, IDisposable
                     MinimumCertificateKeySize = 1024
                 },
                 TransportConfigurations = [],
-                TransportQuotas = new TransportQuotas 
-                { 
+                TransportQuotas = new TransportQuotas
+                {
                     OperationTimeout = 120000,
                     MaxStringLength = 1048576,
                     MaxByteStringLength = 4194304,
@@ -134,18 +134,12 @@ public class OpcUaServerService : IHostedService, IDisposable
                     MaxPublishRequestCount = 20,
                     MaxSubscriptionCount = 100,
                     MaxEventQueueSize = 10000
-                },
-                TraceConfiguration = new TraceConfiguration
-                {
-                    OutputFilePath = Path.Combine(Directory.GetCurrentDirectory(), "logs", "opcua.log"),
-                    DeleteOnLoad = true,
-                    TraceMasks = 519
                 }
             };
 
-            await config.Validate(ApplicationType.Server);
+            await config.ValidateAsync(ApplicationType.Server, cancellationToken);
 
-            _application = new ApplicationInstance
+            _application = new ApplicationInstance(DefaultTelemetry.Create(builder => builder.AddConsole()))
             {
                 ApplicationName = "OPC UA Simulation Server",
                 ApplicationType = ApplicationType.Server,
@@ -153,7 +147,7 @@ public class OpcUaServerService : IHostedService, IDisposable
             };
 
             // Check and create application certificate if needed
-            bool haveAppCertificate = await _application.CheckApplicationInstanceCertificates(silent: true);
+            bool haveAppCertificate = await _application.CheckApplicationInstanceCertificatesAsync(silent: true, ct: cancellationToken);
             if (!haveAppCertificate)
             {
                 _logger.LogWarning("Missing or invalid application certificate, connections may fail.");
@@ -171,7 +165,7 @@ public class OpcUaServerService : IHostedService, IDisposable
 
             // Create and start server
             _server = new CustomOpcUaServer(_nodeService, _logger);
-            await _application.Start(_server);
+            await _application.StartAsync(_server);
 
             _isRunning = true;
             _startTime = DateTime.UtcNow;
