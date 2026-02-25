@@ -1,22 +1,12 @@
 ﻿@page "/svg"
-@inject IJSRuntime JS
+@using SvgViewer.Web.Components.Shared
 
-<PageTitle>SVG</PageTitle>
+<PageTitle>SVG Editor</PageTitle>
 
-<MudText Typo="Typo.h3" GutterBottom="true">SVG</MudText>
+<MudText Typo="Typo.h4" Class="mb-4">SVG Editor</MudText>
 
-<div id="svg-container">
+<MudText Typo="Typo.body2" Class="mb-4" Color="Color.Secondary">
+    Create and edit SVG elements, adjust their visualization, and add custom logic attributes (data-logic-*) to bind them to your automation logic.
+</MudText>
 
-</div>
-
-@code {
-
-    protected override void OnAfterRender(bool firstRender)
-    {
-        if (firstRender)
-        {
-            JS.InvokeVoidAsync("loadSvg");
-        }
-    }
-
-}
+<SvgEditor />

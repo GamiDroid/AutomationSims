@@ -1,0 +1,145 @@
+@using SvgViewer.Web.Models
+@using SvgViewer.Web.Services
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudSelect @bind-Value="Element.Type" Label="Element Type" Variant="Variant.Outlined" Required="true">
+                <MudSelectItem Value="@("rect")">Rectangle</MudSelectItem>
+                <MudSelectItem Value="@("circle")">Circle</MudSelectItem>
+                <MudSelectItem Value="@("ellipse")">Ellipse</MudSelectItem>
+                <MudSelectItem Value="@("line")">Line</MudSelectItem>
+                <MudSelectItem Value="@("polyline")">Polyline</MudSelectItem>
+                <MudSelectItem Value="@("polygon")">Polygon</MudSelectItem>
+                <MudSelectItem Value="@("path")">Path</MudSelectItem>
+                <MudSelectItem Value="@("text")">Text</MudSelectItem>
+                <MudSelectItem Value="@("g")">Group</MudSelectItem>
+            </MudSelect>
+            
+            <MudGrid Spacing="2">
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="Element.X" Label="X Position" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="Element.Y" Label="Y Position" Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
+            
+            @if (Element.Type == "rect" || Element.Type == "ellipse" || Element.Type == "image")
+            {
+                <MudGrid Spacing="2">
+                    <MudItem xs="6">
+                        <MudNumericField @bind-Value="Element.Width" Label="Width" Variant="Variant.Outlined" Min="0" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudNumericField @bind-Value="Element.Height" Label="Height" Variant="Variant.Outlined" Min="0" />
+                    </MudItem>
+                </MudGrid>
+            }
+            
+            @if (Element.Type == "circle")
+            {
+                <MudNumericField @bind-Value="@_radius" Label="Radius" Variant="Variant.Outlined" Min="0" />
+            }
+            
+            @if (Element.Type == "ellipse")
+            {
+                <MudGrid Spacing="2">
+                    <MudItem xs="6">
+                        <MudNumericField @bind-Value="@_radiusX" Label="Radius X" Variant="Variant.Outlined" Min="0" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudNumericField @bind-Value="@_radiusY" Label="Radius Y" Variant="Variant.Outlined" Min="0" />
+                    </MudItem>
+                </MudGrid>
+            }
+            
+            @if (Element.Type == "text")
+            {
+                <MudTextField @bind-Value="Element.Text" Label="Text Content" Variant="Variant.Outlined" Lines="2" />
+            }
+            
+            @if (Element.Type == "path")
+            {
+                <MudTextField @bind-Value="Element.PathData" Label="Path Data (d attribute)" Variant="Variant.Outlined" Lines="3" />
+            }
+            
+            @if (Element.Type == "polyline" || Element.Type == "polygon")
+            {
+                <MudTextField @bind-Value="Element.Points" Label="Points (e.g., '0,0 100,100 200,50')" Variant="Variant.Outlined" />
+            }
+            
+            <MudDivider />
+            
+            <MudText Typo="Typo.subtitle2">Appearance</MudText>
+            
+            <MudGrid Spacing="2">
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="Element.Fill" Label="Fill Color" Variant="Variant.Outlined" 
+                                  Placeholder="#3498db or transparent" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="Element.Stroke" Label="Stroke Color" Variant="Variant.Outlined" 
+                                  Placeholder="#2c3e50" />
+                </MudItem>
+            </MudGrid>
+            
+            <MudGrid Spacing="2">
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="Element.StrokeWidth" Label="Stroke Width" Variant="Variant.Outlined" Min="0" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="Element.Opacity" Label="Opacity" Variant="Variant.Outlined" Min="0" Max="1" Step="0.1" />
+                </MudItem>
+            </MudGrid>
+            
+            <MudTextField @bind-Value="Element.Transform" Label="Transform (SVG syntax)" Variant="Variant.Outlined" 
+                          Placeholder="translate(10, 20) rotate(45)" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">
+            @(IsEdit ? "Update" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    [Parameter] public SvgElement Element { get; set; } = new();
+    [Parameter] public bool IsEdit { get; set; }
+
+    private double _radius;
+    private double _radiusX;
+    private double _radiusY;
+
+    protected override void OnInitialized()
+    {
+        _radius = Element.Radius ?? 50;
+        _radiusX = Element.RadiusX ?? 50;
+        _radiusY = Element.RadiusY ?? 30;
+    }
+
+    private void Submit()
+    {
+        // Update radius properties based on type
+        if (Element.Type == "circle")
+        {
+            Element.Radius = _radius;
+        }
+        else if (Element.Type == "ellipse")
+        {
+            Element.RadiusX = _radiusX;
+            Element.RadiusY = _radiusY;
+        }
+
+        MudDialog.Close(DialogResult.Ok(Element));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

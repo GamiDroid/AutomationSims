@@ -1,10 +1,14 @@
 using MudBlazor.Services;
 using SvgViewer.Web.Components;
+using SvgViewer.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add MudBlazor services
 builder.Services.AddMudServices();
+
+// Add SVG Editor services
+builder.Services.AddSingleton<ISvgEditorService, SvgEditorService>();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()

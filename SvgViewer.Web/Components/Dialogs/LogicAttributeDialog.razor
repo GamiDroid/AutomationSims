@@ -1,0 +1,42 @@
+@using SvgViewer.Web.Models
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="Key" Label="Attribute Key" Variant="Variant.Outlined" Required="true"
+                          Placeholder="e.g., bind, threshold, action, color-on" />
+            
+            <MudTextField @bind-Value="Value" Label="Attribute Value" Variant="Variant.Outlined" Required="true" Lines="2"
+                          Placeholder="e.g., Machine1.Temperature, 80, StartMotor" />
+            
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Logic attributes are stored as <code>data-logic-{key}</code> in the SVG and can be used to bind elements to your automation logic.
+            </MudText>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(!IsValid)">
+            Add
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    public string Key { get; set; } = string.Empty;
+    public string Value { get; set; } = string.Empty;
+
+    private bool IsValid => !string.IsNullOrWhiteSpace(Key) && !string.IsNullOrWhiteSpace(Value);
+
+    private void Submit()
+    {
+        MudDialog.Close(DialogResult.Ok(new KeyValuePair<string, string>(Key.Trim(), Value.Trim())));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

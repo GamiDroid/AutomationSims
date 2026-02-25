@@ -1,0 +1,453 @@
+@using SvgViewer.Web.Models
+@using SvgViewer.Web.Services
+@using SvgViewer.Web.Components.Dialogs
+@inject ISvgEditorService EditorService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@implements IDisposable
+
+<MudGrid>
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-4" Elevation="2" Style="height: calc(100vh - 200px); overflow-y: auto;">
+            <MudStack Row="true" Class="mb-4" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.h6">Elements</MudText>
+                <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                    <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => OpenElementDialog(null, false))">
+                        Add
+                    </MudButton>
+                    <MudButton StartIcon="@Icons.Material.Filled.FileUpload" OnClick="ImportSvg">
+                        Import
+                    </MudButton>
+                    <MudButton StartIcon="@Icons.Material.Filled.FileDownload" OnClick="ExportSvg">
+                        Export
+                    </MudButton>
+                </MudButtonGroup>
+            </MudStack>
+
+            @foreach (var element in EditorService.GetRootElements())
+            {
+                @RenderElementTree(element, 0)
+            }
+        </MudPaper>
+    </MudItem>
+    
+    <MudItem xs="12" md="5">
+        <MudPaper Class="pa-4" Elevation="2" Style="height: calc(100vh - 200px); overflow: hidden; display: flex; flex-direction: column;">
+            <MudText Typo="Typo.h6" Class="mb-4">Canvas</MudText>
+            <div id="svg-canvas" style="flex: 1; border: 1px solid var(--mud-palette-divider); border-radius: 4px; overflow: auto; background: white;">
+            </div>
+        </MudPaper>
+    </MudItem>
+    
+    <MudItem xs="12" md="3">
+        @if (_selectedElement != null)
+        {
+            <MudPaper Class="pa-4" Elevation="2" Style="height: calc(100vh - 200px); overflow-y: auto;">
+                <MudStack Row="true" Class="mb-4" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h6">Properties</MudText>
+                    <MudStack Row="true" Spacing="1">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                       OnClick="@(() => OpenElementDialog(_selectedElement, true))" title="Edit" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       OnClick="DeleteElement" title="Delete" />
+                    </MudStack>
+                </MudStack>
+                
+                <MudDivider Class="mb-4" />
+                
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Basic Properties</MudText>
+                <MudSimpleTable Dense="true" Class="mb-4">
+                    <tbody>
+                        <tr>
+                            <td><strong>ID</strong></td>
+                            <td><MudText Typo="Typo.body2" Style="font-family: monospace;">@_selectedElement.Id</MudText></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Type</strong></td>
+                            <td><MudChip T="string" Size="Size.Small" Color="Color.Info">@_selectedElement.Type</MudChip></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Position</strong></td>
+                            <td>(@_selectedElement.X, @_selectedElement.Y)</td>
+                        </tr>
+                        @if (_selectedElement.Type == "rect" || _selectedElement.Type == "ellipse")
+                        {
+                            <tr>
+                                <td><strong>Size</strong></td>
+                                <td>@_selectedElement.Width × @_selectedElement.Height</td>
+                            </tr>
+                        }
+                        @if (_selectedElement.Type == "circle" && _selectedElement.Radius.HasValue)
+                        {
+                            <tr>
+                                <td><strong>Radius</strong></td>
+                                <td>@_selectedElement.Radius.Value</td>
+                            </tr>
+                        }
+                        @if (!string.IsNullOrEmpty(_selectedElement.Fill))
+                        {
+                            <tr>
+                                <td><strong>Fill</strong></td>
+                                <td>
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        <div style="width: 20px; height: 20px; background: @_selectedElement.Fill; border: 1px solid #ccc; border-radius: 2px;"></div>
+                                        <MudText Typo="Typo.body2">@_selectedElement.Fill</MudText>
+                                    </MudStack>
+                                </td>
+                            </tr>
+                        }
+                        @if (!string.IsNullOrEmpty(_selectedElement.Stroke))
+                        {
+                            <tr>
+                                <td><strong>Stroke</strong></td>
+                                <td>
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        <div style="width: 20px; height: 20px; background: @_selectedElement.Stroke; border: 1px solid #ccc; border-radius: 2px;"></div>
+                                        <MudText Typo="Typo.body2">@_selectedElement.Stroke (@_selectedElement.StrokeWidth)</MudText>
+                                    </MudStack>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+                
+                <MudDivider Class="mb-4" />
+                
+                <MudStack Row="true" Class="mb-2" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.subtitle2">Logic Attributes</MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="OpenLogicAttributeDialog" title="Add logic attribute" />
+                </MudStack>
+                
+                @if (_selectedElement.LogicAttributes.Count > 0)
+                {
+                    <MudList T="string" Dense="true">
+                        @foreach (var (key, value) in _selectedElement.LogicAttributes)
+                        {
+                            <MudListItem T="string">
+                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                    <div>
+                                        <MudText Typo="Typo.body2"><strong>@key</strong></MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">@value</MudText>
+                                    </div>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                   OnClick="@(() => RemoveLogicAttribute(key))" />
+                                </MudStack>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">No logic attributes defined</MudText>
+                }
+            </MudPaper>
+        }
+        else
+        {
+            <MudPaper Class="pa-8" Elevation="2" Style="height: calc(100vh - 200px);">
+                <MudStack AlignItems="AlignItems.Center" Spacing="4" Justify="Justify.Center" Style="height: 100%;">
+                    <MudIcon Icon="@Icons.Material.Filled.TouchApp" Size="Size.Large" Color="Color.Default" />
+                    <MudText Typo="Typo.h6" Color="Color.Default">Select an element</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Default" Align="Align.Center">
+                        Click on an element in the tree or canvas<br/>to view and edit its properties
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    private SvgElement? _selectedElement;
+    private HashSet<string> _expandedNodes = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        EditorService.ElementAdded += OnElementChanged;
+        EditorService.ElementUpdated += OnElementChanged;
+        EditorService.ElementDeleted += OnElementDeleted;
+        EditorService.ElementSelected += OnElementSelectedByService;
+
+        // Add some demo elements
+        AddDemoElements();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await RenderCanvas();
+        }
+    }
+
+    private void AddDemoElements()
+    {
+        var rect = new SvgElement
+        {
+            Type = "rect",
+            X = 50,
+            Y = 50,
+            Width = 100,
+            Height = 100,
+            Fill = "#3498db",
+            Stroke = "#2c3e50",
+            StrokeWidth = 2
+        };
+        rect.LogicAttributes["bind"] = "Machine1.Temperature";
+        rect.LogicAttributes["threshold"] = "80";
+        EditorService.AddElement(rect);
+
+        var circle = new SvgElement
+        {
+            Type = "circle",
+            X = 250,
+            Y = 100,
+            Radius = 50,
+            Fill = "#e74c3c",
+            Stroke = "#c0392b",
+            StrokeWidth = 2
+        };
+        circle.LogicAttributes["bind"] = "Machine1.Status";
+        circle.LogicAttributes["on-value"] = "#2ecc71";
+        circle.LogicAttributes["off-value"] = "#e74c3c";
+        EditorService.AddElement(circle);
+    }
+
+    private RenderFragment RenderElementTree(SvgElement element, int level) => __builder =>
+    {
+        var isExpanded = _expandedNodes.Contains(element.Id);
+        var isSelected = _selectedElement?.Id == element.Id;
+        var hasChildren = element.Children.Count > 0;
+
+        <div style="padding-left: @(level * 20)px;">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="@(isSelected ? "mud-primary-text" : "")" 
+                      Style="@(isSelected ? "background-color: var(--mud-palette-primary-lighten); border-radius: 4px; padding: 4px;" : "padding: 4px;")">
+                @if (hasChildren)
+                {
+                    <MudIconButton Icon="@(isExpanded ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" 
+                                   Size="Size.Small" OnClick="@(() => ToggleExpand(element.Id))" />
+                }
+                else
+                {
+                    <div style="width: 40px;"></div>
+                }
+                <MudIcon Icon="@GetElementIcon(element)" Size="Size.Small" Class="mr-2" />
+                <MudLink Color="@(isSelected ? Color.Primary : Color.Default)" 
+                         OnClick="@(() => OnElementSelected(element))" 
+                         Style="flex-grow: 1; cursor: pointer;">
+                    @GetElementDisplayText(element)
+                </MudLink>
+                @if (isSelected)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" 
+                                   OnClick="@(() => OpenElementDialog(element, false))" title="Add child" />
+                }
+            </MudStack>
+        </div>
+
+        @if (isExpanded && hasChildren)
+        {
+            foreach (var child in element.Children)
+            {
+                @RenderElementTree(child, level + 1)
+            }
+        }
+    };
+
+    private void ToggleExpand(string elementId)
+    {
+        if (_expandedNodes.Contains(elementId))
+        {
+            _expandedNodes.Remove(elementId);
+        }
+        else
+        {
+            _expandedNodes.Add(elementId);
+        }
+    }
+
+    private string GetElementIcon(SvgElement element)
+    {
+        return element.Type switch
+        {
+            "rect" => Icons.Material.Filled.Rectangle,
+            "circle" => Icons.Material.Filled.Circle,
+            "ellipse" => Icons.Material.Filled.Circle,
+            "line" => Icons.Material.Filled.HorizontalRule,
+            "polyline" => Icons.Material.Filled.ShowChart,
+            "polygon" => Icons.Material.Filled.Pentagon,
+            "path" => Icons.Material.Filled.Timeline,
+            "text" => Icons.Material.Filled.TextFields,
+            "g" or "group" => Icons.Material.Filled.Folder,
+            _ => Icons.Material.Filled.Circle
+        };
+    }
+
+    private string GetElementDisplayText(SvgElement element)
+    {
+        var logicInfo = element.LogicAttributes.ContainsKey("bind") 
+            ? $" [{element.LogicAttributes["bind"]}]" 
+            : "";
+        return $"{element.Type} (#{element.Id}){logicInfo}";
+    }
+
+    private void OnElementSelected(SvgElement? element)
+    {
+        _selectedElement = element;
+
+        if (element != null)
+        {
+            EditorService.SelectElement(element.Id);
+            _ = HighlightElementInCanvas(element.Id);
+        }
+    }
+
+    private void OnElementChanged(object? sender, SvgElement element)
+    {
+        InvokeAsync(async () =>
+        {
+            await RenderCanvas();
+            StateHasChanged();
+        });
+    }
+
+    private void OnElementDeleted(object? sender, string elementId)
+    {
+        InvokeAsync(async () =>
+        {
+            if (_selectedElement?.Id == elementId)
+            {
+                _selectedElement = null;
+            }
+            await RenderCanvas();
+            StateHasChanged();
+        });
+    }
+
+    private void OnElementSelectedByService(object? sender, string elementId)
+    {
+        InvokeAsync(() =>
+        {
+            _selectedElement = EditorService.GetElement(elementId);
+            StateHasChanged();
+        });
+    }
+
+    private async Task OpenElementDialog(SvgElement? parent, bool isEdit)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(SvgElementDialog.Element), isEdit ? _selectedElement! : new SvgElement { ParentId = parent?.Id } },
+            { nameof(SvgElementDialog.IsEdit), isEdit }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<SvgElementDialog>(
+            isEdit ? "Edit Element" : "Create Element", 
+            parameters, 
+            options
+        );
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: SvgElement element })
+        {
+            if (isEdit)
+            {
+                EditorService.UpdateElement(element);
+                Snackbar.Add("Element updated", Severity.Success);
+            }
+            else
+            {
+                EditorService.AddElement(element, parent?.Id);
+                if (parent != null)
+                {
+                    _expandedNodes.Add(parent.Id);
+                }
+                Snackbar.Add("Element added", Severity.Success);
+            }
+            await RenderCanvas();
+        }
+    }
+
+    private async Task OpenLogicAttributeDialog()
+    {
+        if (_selectedElement == null) return;
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<LogicAttributeDialog>("Add Logic Attribute", options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: KeyValuePair<string, string> kvp })
+        {
+            EditorService.SetLogicAttribute(_selectedElement.Id, kvp.Key, kvp.Value);
+            Snackbar.Add($"Logic attribute '{kvp.Key}' added", Severity.Success);
+            await RenderCanvas();
+        }
+    }
+
+    private void RemoveLogicAttribute(string key)
+    {
+        if (_selectedElement != null)
+        {
+            EditorService.RemoveLogicAttribute(_selectedElement.Id, key);
+            Snackbar.Add($"Logic attribute '{key}' removed", Severity.Info);
+            _ = RenderCanvas();
+        }
+    }
+
+    private async Task DeleteElement()
+    {
+        if (_selectedElement == null) return;
+
+        var confirmed = await DialogService.ShowMessageBox(
+            "Confirm Delete",
+            $"Delete element '{_selectedElement.Type} (#{_selectedElement.Id})'? All children will also be deleted.",
+            yesText: "Delete",
+            cancelText: "Cancel"
+        );
+
+        if (confirmed == true)
+        {
+            EditorService.DeleteElement(_selectedElement.Id);
+            _selectedElement = null;
+            Snackbar.Add("Element deleted", Severity.Success);
+        }
+    }
+
+    private async Task ImportSvg()
+    {
+        // Note: File upload would require additional implementation
+        Snackbar.Add("Import functionality requires file upload component", Severity.Info);
+    }
+
+    private async Task ExportSvg()
+    {
+        var svgContent = await EditorService.ExportDocumentAsync();
+        await JS.InvokeVoidAsync("downloadSvg", EditorService.CurrentDocument.Name + ".svg", svgContent);
+        Snackbar.Add("SVG exported", Severity.Success);
+    }
+
+    private async Task RenderCanvas()
+    {
+        var elements = EditorService.GetAllElements().ToList();
+        await JS.InvokeVoidAsync("svgEditor.renderCanvas", 
+            EditorService.CurrentDocument.Width, 
+            EditorService.CurrentDocument.Height,
+            elements);
+    }
+
+    private async Task HighlightElementInCanvas(string elementId)
+    {
+        await JS.InvokeVoidAsync("svgEditor.highlightElement", elementId);
+    }
+
+    public void Dispose()
+    {
+        EditorService.ElementAdded -= OnElementChanged;
+        EditorService.ElementUpdated -= OnElementChanged;
+        EditorService.ElementDeleted -= OnElementDeleted;
+        EditorService.ElementSelected -= OnElementSelectedByService;
+    }
+}
