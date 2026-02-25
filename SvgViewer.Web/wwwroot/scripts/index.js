@@ -7,9 +7,11 @@ window.svgEditor = (function() {
 
     function init() {
         const container = document.getElementById('svg-canvas');
-        if (container) {
+        if (container && typeof SVG !== 'undefined') {
             container.innerHTML = '';
             draw = SVG().addTo('#svg-canvas');
+        } else if (typeof SVG === 'undefined') {
+            console.error('SVG.js library not loaded. Make sure the CDN script is included before this script.');
         }
     }
 
