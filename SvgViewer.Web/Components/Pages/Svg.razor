@@ -1,0 +1,22 @@
+﻿@page "/svg"
+@inject IJSRuntime JS
+
+<PageTitle>SVG</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">SVG</MudText>
+
+<div id="svg-container">
+
+</div>
+
+@code {
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            JS.InvokeVoidAsync("loadSvg");
+        }
+    }
+
+}

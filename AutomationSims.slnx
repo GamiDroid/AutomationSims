@@ -7,4 +7,5 @@
   <Project Path="CoffeeMaker.Api/CoffeeMaker.Api.csproj" />
   <Project Path="Mqtt.Common/Mqtt.Common.csproj" Id="fe701e32-e79e-4ba5-8715-5af3d060859f" />
   <Project Path="OpcUaServer.Web/OpcUaServer.Web.csproj" />
+  <Project Path="SvgViewer.Web/SvgViewer.Web.csproj" Id="97f68e54-2eb5-4e80-aca7-b116baadb48f" />
 </Solution>
