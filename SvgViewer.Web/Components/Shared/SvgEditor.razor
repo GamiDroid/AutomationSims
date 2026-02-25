@@ -16,7 +16,8 @@
                     <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => OpenElementDialog(null, false))">
                         Add
                     </MudButton>
-                    <MudButton StartIcon="@Icons.Material.Filled.FileUpload" OnClick="ImportSvg">
+                    <MudFileUpload @ref="_fileUploadElement" T="IBrowserFile" Hidden=true Accept=".svg" OnFilesChanged="ImportSvg" />
+                    <MudButton StartIcon="@Icons.Material.Filled.FileUpload" OnClick="OpenFilePicker">
                         Import
                     </MudButton>
                     <MudButton StartIcon="@Icons.Material.Filled.FileDownload" OnClick="ExportSvg">
@@ -162,6 +163,7 @@
 @code {
     private SvgElement? _selectedElement;
     private HashSet<string> _expandedNodes = [];
+    private MudFileUpload<IBrowserFile> _fileUploadElement = null!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -416,10 +418,32 @@
         }
     }
 
-    private async Task ImportSvg()
+    private Task OpenFilePicker()
     {
-        // Note: File upload would require additional implementation
-        Snackbar.Add("Import functionality requires file upload component", Severity.Info);
+        return _fileUploadElement.OpenFilePickerAsync();
+    }
+
+    private async Task ImportSvg(InputFileChangeEventArgs e)
+    {
+        if (e.FileCount == 0)
+            return;
+
+        using var stream = e.File.OpenReadStream(maxAllowedSize: 512000 * 100);
+        // get all content of the file stream
+
+        using var reader = new StreamReader(stream);
+        var svg = await reader.ReadToEndAsync();
+
+        var ok = await EditorService.LoadDocumentAsync(svg);
+        if (ok)
+        {
+            Snackbar.Add("SVG imported successfully", Severity.Success);
+            await RenderCanvas();
+        }
+        else
+        {
+            Snackbar.Add("Failed to import SVG. Please check the file format.", Severity.Error);
+        }
     }
 
     private async Task ExportSvg()
